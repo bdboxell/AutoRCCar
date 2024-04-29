@@ -3,6 +3,7 @@ from graphics import *
 import pygame
 from clock import *
 import time
+from data_logging import *
 
 class Car:
     dimens = (3, 5) # Width x Length
@@ -309,6 +310,7 @@ class Car:
             produce_neighbors function
     '''
     def plan_path(self, target, cognizant):
+        start_plan_time = time.time()
         self.last_update = Clock.time
         if (self.speed<=5):
             max_iter = 800
@@ -337,8 +339,8 @@ class Car:
             cur_cell = frontier.pop(0)
             explored.append(cur_cell)
 
-            # cur_cell.car.draw()
-            # pygame.display.flip()
+            cur_cell.car.draw()
+            pygame.display.flip()
 
             neighbors = cur_cell.car.produce_neighbors()
             neighbors = self.prune_collisions(neighbors, self.map)
@@ -459,6 +461,8 @@ class Car:
         if (dangerous_route):
             for car in self.other_cars:
                 car.plan_path(car.goal, True)
+        duration = time.time() - start_plan_time
+        Data_Logger.planning_times.append(duration)
         # print("Goal Found!")
         return path
                 

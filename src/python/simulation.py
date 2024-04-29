@@ -4,6 +4,7 @@ import pygame
 from clock import *
 from car import*
 import time
+from data_logging import *
 
 '''
     Simulation
@@ -15,6 +16,7 @@ class Simulation:
         self.dimens = dimens
         self.frame = frame
         self.sim_start()
+        self.done = False
         
     def sim_start(self):
         self.last_real_time = time.time()
@@ -39,21 +41,27 @@ class Simulation:
         self.map.init()
 
     def update(self):
-        self.map.draw()
-        self.car2.update()
-        # print('Car2 done updating')
-        self.car.update()
-        # print('Car1 done updating')
+        if (not self.done and Clock.time > 300):
+            Data_Logger.print_data()
+            self.done = True
+        elif (not self.done):
+            self.map.draw()
+            self.car2.update()
+            # print('Car2 done updating')
+            self.car.update()
+            # print('Car1 done updating')
 
 
-        self.car.draw()
-        self.car2.draw()
+            self.car.draw()
+            self.car2.draw()
 
-        # test_point = Pose(90,38, math.radians(90))
-        # Graphics.draw_circle(self.frame, Colors.red, test_point.to_vector(), 1)
-        # self.car2.plan_path(test_point, True)
+            # test_point = Pose(90,38, math.radians(90))
+            # Graphics.draw_circle(self.frame, Colors.red, test_point.to_vector(), 1)
+            # self.car2.plan_path(test_point, True)
 
-        # Update simulation timer
-        while (time.time() - self.last_real_time < Clock.timestep):
-            time.sleep(0.001)
-        Clock.increment()
+            # Update simulation timer
+            while (time.time() - self.last_real_time < Clock.timestep):
+                time.sleep(0.001)
+            Clock.increment()
+            print(Clock.time)
+       
