@@ -328,6 +328,7 @@ class Car:
         # return False
         frontier = [start_cell]
         explored = []
+        recovery_attempt = 0
 
         while not found:
 
@@ -394,19 +395,24 @@ class Car:
 
                 # If you are in front, you have right of way. Don't worry about the 
                 # other cars.
+                if (recovery_attempt >3):
+                    "Car #", self.car_num, " in Recovery Mode 1: Ignoring other cars"
+                    for i in range(5):
+                        self.cycle_goal_pose()
+                    target = self.cycle_goal_pose()
+                    self.goal = target
+                    recovery_attempt = 0
                 if (in_front):
 
                     print("Car #", self.car_num, " in Recovery Mode 1: Ignoring other cars")
-                    print(dist)
-                    time.sleep(2)
+                    recovery_attempt = recovery_attempt + 1
                     cognizant = False
                     pause_delta_t = self.planning_delta_t
                     dangerous_route = True
                 else:
                     # Otherwise, slow down and let them by.
                     print("Car #", self.car_num, " in Recovery Mode 2: Possibly blocked off, slowing down")
-                    time.sleep(2)
-                    
+                    recovery_attempt = recovery_attempt + 1
                     pause_delta_t = 3
                     delta_v = 0
                     pose = self.kinematics(0, self.wheel_angle, pause_delta_t)
@@ -417,6 +423,7 @@ class Car:
                 frontier = [start_cell]
                 explored = []
                 iter = 0
+                
 
             iter = iter+1
         
