@@ -57,7 +57,9 @@ class Map:
         ref_point = Vector(x,y)
         distance = point.distance(ref_point)
 
-        if (distance > self.corner_radii[0] and distance < self.corner_radii[0] + self.lane_width):
+        padding = 1
+
+        if (distance > self.corner_radii[0]+padding and distance < self.corner_radii[0] + self.lane_width-padding):
             return True
         else:
             return False

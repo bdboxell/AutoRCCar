@@ -2,12 +2,13 @@ from colors import *
 from graphics import *
 import pygame
 from clock import *
+import time
 
 class Car:
     dimens = (3, 5) # Width x Length
-    max_speed = 10
+    max_speed = 4
     min_turn_radius = 13
-    planning_delta_t = 0.25
+    planning_delta_t = 0.125
 
     def __init__(self, frame, coords, map):
         self.frame = frame
@@ -20,8 +21,12 @@ class Car:
         self.map = map
         self.in_pursuit = False
         self.waypoints = []
-
+        self.color = Colors.green
+        self.other_cars = []
         self.goal_poses = [Pose(90,38, math.radians(90)),Pose(50,65, math.radians(-180)),Pose(10,38, math.radians(-90)),Pose(50,10, math.radians(0))]
+        self.goal = self.goal_poses[0]
+        self.last_update = -999
+        self.car_num = 0
     '''
         Start
     '''
@@ -46,8 +51,16 @@ class Car:
             Called once per loop iteration. Updates all kinematic parameters of the car
     '''
     def update(self):
+        # Check to see if you're within sight of the goal
+        dist = self.pose.to_vector().distance(self.goal.to_vector())
         #  If there's a path, then follow it
-        if (len(self.path) > 0):
+        
+        if (Clock.time - self.last_update > 10 or len(self.path)==0):
+            if (dist<10):
+                self.goal = self.cycle_goal_pose()
+
+            self.path = self.plan_path(self.goal, True)
+        else:
             if (self.path[0].timestamp < Clock.time):
                 # print("Following path")
                 self.in_pursuit = True
@@ -56,13 +69,6 @@ class Car:
                 self.wheel_angle = cell.car.wheel_angle
                 self.pose = cell.car.pose
                 self.last_pursuit_time = Clock.time
-        else:
-            # Else, figure out the next goal pose and plan a path to it
-
-                goal = self.goal_poses.pop(0)
-                self.goal_poses.append(goal)
-
-                self.path = self.plan_path(goal, [])
             
         delta_t = Clock.time - self.last_time
         self.last_time = Clock.time
@@ -70,12 +76,33 @@ class Car:
 
         self.update_self()
 
+    def update_without_planning(self):
+        if (len(self.path)>0):
+            if (self.path[0].timestamp < Clock.time):
+                # print("Following path")
+                self.in_pursuit = True
+                cell = self.path.pop(0)
+                self.speed = cell.car.speed
+                self.wheel_angle = cell.car.wheel_angle
+                self.pose = cell.car.pose
+                self.last_pursuit_time = Clock.time
+            
+        delta_t = Clock.time - self.last_time
+        self.last_time = Clock.time
+        self.pose = self.kinematics(self.speed, self.wheel_angle, delta_t)
+
+        self.update_self()
+
+    def cycle_goal_pose(self):
+        goal = self.goal_poses.pop(0)
+        self.goal_poses.append(goal)
+        return goal
     '''
         Draw
             Uses graphics library to draw the car at whatever the current pose is
     '''
     def draw(self):
-        Graphics.draw_rect(self.frame, Colors.blue, self.pose.to_vector(), self.dimens, self.pose.theta)
+        Graphics.draw_rect(self.frame, self.color, self.pose.to_vector(), self.dimens, self.pose.theta)
         
         # Uncomment to View Orientation Vectors
         # Graphics.draw_vector(self.frame, Colors.red, self.pose.to_vector(), self.direction)
@@ -93,14 +120,10 @@ class Car:
             Returns true if this car is colliding with another car
     '''
     def collides(self, car):
-        print("Self:")
         for point in self.get_corners():
-            point.print()
             if (car.contains(point)):
                 return True
-        print("Other:")
         for point in car.get_corners():
-            point.print()
             if (self.contains(point)):
                 return True
         return False
@@ -111,7 +134,7 @@ class Car:
             Returns true if the point exists within the car's footprint
     '''
     def contains(self, p):
-        padded_dimens = (self.dimens[0]/2 + 0.5,self.dimens[1]/2 + 0.5)
+        padded_dimens = (self.dimens[0]/2 + 1,self.dimens[1]/2 + 1)
         point = p.copy()
         # Get the point's coordinates relative to the car
 
@@ -209,7 +232,7 @@ class Car:
         accelerations = [-1, 0, 1]
         # distances = [-1, 1]
         for accel in accelerations: # The distance that the car is capable of driving in the next loop iteration
-            for wheel_angle in range(-15,16,5):
+            for wheel_angle in range(-20,21,5):
                     new_pose = self.kinematics(self.speed+accel, wheel_angle+wheel_angle, self.planning_delta_t)
                     virtual_car = Car(self.frame, new_pose, map)
                     virtual_car.speed = self.speed + accel
@@ -236,6 +259,48 @@ class Car:
             if valid:
                 valid_neighbors.append(virtual_car)
         return valid_neighbors
+    
+    def causes_accident(self, new_cell):
+        valid = True
+        for car in self.other_cars:
+
+            t = new_cell.timestamp
+            i = 0
+            found = False
+            replanned = False
+            while (not found):
+                if (i>=len(car.path)):
+                    dist = car.pose.to_vector().distance(car.goal.to_vector())
+                    # Graphics.draw_circle(self.frame, Colors.red, car.pose.to_vector(), 1)
+                    # print(i * self.planning_delta_t)
+                    if (replanned and i * self.planning_delta_t<=t):
+                        print('Too far in future to predict')
+                        return False
+                    elif (Clock.time - car.last_update>5 and not replanned):
+                        print('Forcing replan for collision prediction')
+                        goal = car.goal
+                        car.path = car.plan_path(goal, False)
+                        i = 0
+                        replanned = True
+                    else:
+                        return False
+                    # Graphics.draw_circle(self.frame, Colors.green, car.goal.to_vector(), 1)
+                    
+
+                elif (i>=len(car.path)):
+                    # If you've already replanned, and you still can't find it,
+                    # it means the algorithm can not see that far into the future.
+                        return False
+                
+                if (abs(car.path[i].timestamp - t)<0.13):
+                    found = True
+                else:
+                    i = i+1
+                
+            if (new_cell.car.collides(car.path[i].car)):
+                # print('potential collision detected')
+                valid = False
+        return not valid
     '''
         Plan Path
             Handles the path planning for the car
@@ -243,10 +308,19 @@ class Car:
             Uses A* based on the kinematic possibilities found in the
             produce_neighbors function
     '''
-    def plan_path(self, target, obstacles):
-        max_iter = 100000
+    def plan_path(self, target, cognizant):
+        self.last_update = Clock.time
+        if (self.speed<=5):
+            max_iter = 800
+        else:
+            max_iter = 200
+        
+        dangerous_route = False
         iter = 0
         found = False
+        # Graphics.draw_circle(self.frame, self.color, self.pose.to_vector(), 1)
+
+        # Graphics.draw_circle(self.frame, Colors.green, target.to_vector(), 1)
 
         # In this case, the frontier is a list of virtual cars, starting with itself
         cost = self.cost_function(self, target)
@@ -255,7 +329,7 @@ class Car:
         frontier = [start_cell]
         explored = []
 
-        while not found and iter<max_iter:
+        while not found:
 
             # Sort the frontier based on cost function
             frontier = sorted(frontier, key=lambda x:x.cost)
@@ -277,32 +351,88 @@ class Car:
                     combined.append(cell)
                 for cell in combined:
                     (dist, delta_theta) = cell.car.pose.distance(virtual_car.pose)
-                    if (abs(dist)<0.2 and abs(delta_theta)< math.radians(30)):
+                    if (abs(dist)<0.1 and abs(delta_theta)< math.radians(30)):
                         valid_neighbor = False
                         break
                 
                 # If it is still a valid neighbor, add it to the frontier
                 if valid_neighbor:
                     cost = self.cost_function(virtual_car, target)
+                    virtual_car.max_speed = self.max_speed
                     new_cell = Car.Cell(cur_cell, virtual_car, cost, self.planning_delta_t)
-                    frontier.append(new_cell)
+
+                    # Prune for collisisons
+                    if (not cognizant):
+                        frontier.append(new_cell)
+                    elif (cognizant and not self.causes_accident(new_cell)):
+                        frontier.append(new_cell)
+
+
             
             # Check to see if you've found the target
             (dist, delta_theta) = target.distance(cur_cell.car.pose)
-            if (abs(dist)< 3): # and abs(delta_theta) < math.radians(2)):
+            if (abs(dist)< 8): # and abs(delta_theta) < math.radians(2)):
                 found = True
-            elif (len(frontier) == 0):
-                print("Empty Frontier! Backing up...")
-                pose = self.kinematics(-0.5, 5, 0.25)
-                self.pose = pose
-                return self.plan_path(target, obstacles)
+            elif (len(frontier) == 0 or iter>=max_iter):
+                # print("Empty Frontier! Backing up...")
+                # pose = self.kinematics(-0.5, 5, 0.25)
+                # self.pose = pose
+                # return self.plan_path(target, cognizant)
+            
+                # Recovery Modes!
+                # First, determine if you are in front of the other cars nearby
+                in_front = True
+                for car in self.other_cars:
+                    car_to_car = car.pose.to_vector()
+                    car_to_car.add(self.pose.to_vector().multiply(-1))
+                    dist = car_to_car.magnitude()
+                    if (dist < 20):
+                        unit_car_to_car = car_to_car.project(self.direction).unit_vector()
+                        if (unit_car_to_car.equals(self.direction.unit_vector())):
+                            in_front = False
+                        unit_car_to_car.print()
+
+                # If you are in front, you have right of way. Don't worry about the 
+                # other cars.
+                if (in_front):
+
+                    print("Car #", self.car_num, " in Recovery Mode 1: Ignoring other cars")
+                    print(dist)
+                    time.sleep(2)
+                    cognizant = False
+                    pause_delta_t = self.planning_delta_t
+                    dangerous_route = True
+                else:
+                    # Otherwise, slow down and let them by.
+                    print("Car #", self.car_num, " in Recovery Mode 2: Possibly blocked off, slowing down")
+                    time.sleep(2)
+                    
+                    pause_delta_t = 3
+                    delta_v = 0
+                    pose = self.kinematics(0, self.wheel_angle, pause_delta_t)
+                    self.pose = pose
+                    self.speed = 0
+                start_cell = Car.Cell(start_cell, self, 0, pause_delta_t)
+                # return False
+                frontier = [start_cell]
+                explored = []
+                iter = 0
 
             iter = iter+1
         
-        # Handle the case where it maxed out iterations
-        if (iter>=max_iter):
-            print("Unable to find goal: Maxed Iterations")
-            return False
+            # # Handle the case where it maxed out iterations
+            # if (iter>=max_iter):
+            #     print("Possibly blocked off, slowing down")
+            #     pause_delta_t = 0.5
+            #     delta_v = 0
+            #     pose = self.kinematics(0, self.wheel_angle, pause_delta_t)
+            #     self.pose = pose
+            #     self.speed = self.speed - delta_v
+            #     start_cell = Car.Cell(start_cell, self, 0, pause_delta_t)
+            #     # return False
+            #     frontier = [start_cell]
+            #     explored = []
+            #     iter = 0
         
         # If you've made it this far, it must have been successful
         # Now backtrack and return the successful path
@@ -318,7 +448,10 @@ class Car:
                 else:
                     cur_cell = cur_cell.parent
         path.reverse()
-
+        self.path = path
+        if (dangerous_route):
+            for car in self.other_cars:
+                car.plan_path(car.goal, True)
         # print("Goal Found!")
         return path
                 
@@ -326,15 +459,30 @@ class Car:
     def cost_function(self, car, target):
 
         (euc_dist, delta_theta) = target.distance(car.pose)
+        if (self.speed<5):
+            dist_gain = 30
+            wall_dist_gain = -20
+            speed_gain = -1
+        else:
+            dist_gain = 18
+            wall_dist_gain = -20
+            speed_gain = -1
 
-        # Negative because higher speeds have lower cost
-        speed_gain = -1
+        min_dist = 9999
+        for other_car in self.other_cars:
+            car_to_car = other_car.pose.to_vector()
+            car_to_car.add(self.pose.to_vector().multiply(-1))
+            dist = car_to_car.magnitude()
+            if (dist<min_dist):
+                min_dist = dist
+        # print(min_dist)
+        collision_gain = 75/math.pow(min_dist,1)
+        # collision_gain = 0
 
-        # Negative because smaller wall distances have higher cost
-        wall_dist_gain = -2.2
+
         wall_dist = self.map.dist_from_wall(car.pose.to_vector())
 
-        cost = euc_dist * 5 + car.speed*speed_gain + wall_dist*wall_dist_gain
+        cost = euc_dist * dist_gain + car.speed*speed_gain + wall_dist*wall_dist_gain + collision_gain
 
         return cost
     
