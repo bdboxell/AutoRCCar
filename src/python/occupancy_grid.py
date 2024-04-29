@@ -1,6 +1,7 @@
 from tetromino import *
 from graphics import *
 from colors import *
+from clock import *
 
 
 '''
@@ -70,6 +71,24 @@ class OccupancyGrid:
             tet.draw()
         # Graphics.draw_circle(self.frame, Colors.blue, Math_Utils.Vector(100,100), 10)
 
+    def conflagration(self):
+        for tet in self.burning_tets:
+            if (tet.exploded == False):
+                if Clock.time - tet.fire_timestamp > 10:
+                    tet.exploded = True
+                    base_coords = Math_Utils.Vector(tet.coords[0],tet.coords[1])
+                    for new_victim in self.tet_list:
+                        new_coords = Math_Utils.Vector(new_victim.coords[0],new_victim.coords[1])
+                        dist = base_coords.distance(new_coords)
+                        if (dist < 30):
+                            if (not new_victim.extinguished):
+                                new_victim.burning = True
+                                new_victim.fire_timestamp = Clock.time
+                                self.burning_tets.append(new_victim)
+
+
+
+
     '''
         Draw Occupancy Grid
             Draws the representation of the occupancy grid generated
@@ -107,3 +126,21 @@ class OccupancyGrid:
                 if (self.occ_grid[y][x] == 1):
                     count = count+1
         print("\n", count, " cells are occupied out of ", self.width*self.height)
+
+    def statistics(self):
+        extinguished = 0
+        burned = 0
+        in_tact = 0
+        for tet in self.tet_list:
+            if tet.extinguished:
+                extinguished = extinguished+1
+            elif tet.burning:
+                burned = burned + 1
+            else:
+                in_tact = in_tact + 1
+        print("Extinguished:")
+        print(extinguished)
+        print("Burned")
+        print(burned)
+        print("In Tact")
+        print(in_tact)

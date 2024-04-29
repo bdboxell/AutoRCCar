@@ -26,10 +26,10 @@ class Graphics:
         h = dimens[0]
         w = dimens[1]
         points = []
-        points.append(Math_Utils.Vector(w/2,h/2))
-        points.append(Math_Utils.Vector(-w/2,h/2))
-        points.append(Math_Utils.Vector(-w/2,-h/2))
-        points.append(Math_Utils.Vector(w/2,-h/2))
+        points.append(Vector(w/2,h/2))
+        points.append(Vector(-w/2,h/2))
+        points.append(Vector(-w/2,-h/2))
+        points.append(Vector(w/2,-h/2))
         
         for point in points:
             point.rotate(theta)
@@ -44,7 +44,7 @@ class Graphics:
             
             Graphics.draw_line(frame, color, points[i], points[j], 0.25)
 
-        '''
+    '''
         Fill Rect
             Draws a rectangle in the specified frame
 
@@ -52,16 +52,40 @@ class Graphics:
             Frame: Reference frame to be drawn in
             Center: (Vector) Coordinates of the center of the rectangle
             Dimens: (Tuple) Width x Length
-            Theta: Angle of the rectangle
     '''
     def fill_rect(frame, color, center, dimens):
         w = dimens[0]
         h = dimens[1]
-        top_left = Math_Utils.Vector(-w/2,h/2)
+        top_left = Vector(-w/2,h/2)
         top_left.add(center)
         
         top_left = Graphics.transform_coords(frame, top_left.to_tuple())
         pygame.draw.rect(Graphics.screen, color, (top_left[0], top_left[1], w*Graphics.ppm,h*Graphics.ppm))
+
+    '''
+        Fill Rounded Rect
+            Draws a filleted rectangle in the specified frame
+
+            Color: Color of the rectangle
+            Frame: Reference frame to be drawn in
+            Center: (Vector) Coordinates of the center of the rectangle
+            Dimens: (Tuple) Width x Length
+            R: Corner radius
+    '''
+    def fill_rounded_rect(frame, color, center, dimens, r):
+        w = dimens[0]
+        h = dimens[1]
+        base_width = w - 2*r
+        base_height = h - 2*r
+
+        base_rect = Rectangle(Vector(1,1), Vector(1,1))
+        base_rect.def_by_center(center, Vector(base_width,base_height))
+        Graphics.fill_rect(frame, color, center, (base_width, h))
+        Graphics.fill_rect(frame, color, center, (w, base_height))
+        Graphics.draw_circle(frame, color, base_rect.top_left, r)
+        Graphics.draw_circle(frame, color, base_rect.top_right, r)
+        Graphics.draw_circle(frame, color, base_rect.bottom_left, r)
+        Graphics.draw_circle(frame, color, base_rect.bottom_right, r)
 
 
     '''
@@ -87,7 +111,7 @@ class Graphics:
 
             Color: Color of the circle
             Frame: Reference frame to be drawn in
-            Coords: (Tuple) Coordinates of the center
+            Coords: (Vector) Coordinates of the center
             Radius: Radius of the circle
     '''
     def draw_circle(frame, color, coords, radius):

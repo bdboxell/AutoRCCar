@@ -80,8 +80,8 @@ class Search:
                 path.append((cur_cell.x,cur_cell.y))
                 at_start = True
         path.reverse()
-        print("Goal Found!")
-        print(type, ", ", iter)
+        # print("Goal Found!")
+        # print(type, ", ", iter)
         return path
 
 

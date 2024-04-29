@@ -46,6 +46,8 @@ class Tetromino:
         self.frame = frame
         self.populate_occupancy()
         self.burning = False
+        self.extinguished = False
+        self.exploded = False
 
     '''
         Populate Occupancy
@@ -100,7 +102,9 @@ class Tetromino:
 
             # Graphics.draw_circle(self.frame, Colors.blue, Math_Utils.Vector(250,0), 10)
             # Graphics.draw_circle(self.frame, Colors.red, center, 10)
-            if (self.burning):
+            if (self.extinguished):
+                self.color = Colors.black
+            elif (self.burning):
                 self.color = Colors.red
             else:
                 self.color = Colors.dark_green

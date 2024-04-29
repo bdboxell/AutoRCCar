@@ -1,5 +1,7 @@
 import pygame
 from colors import *
+from math_utils import *
+from graphics import *
 '''
     Map
         The class responsible for all information and actions regarding the track
@@ -7,36 +9,101 @@ from colors import *
 class Map:
     '''
         Constructor
-            coords: (Tuple) (x,y) position of the top left corner of the bounding box of the track
-            dimens: (Tuple) width and height of the bounding box of the track
+            dimens: Vector width and height of the bounding box of the track
             lane_width: width of the lanes of the track
             corner_radii: (Tuple) radius of the (inner corners, outer corners)
     '''
-    def __init__(self, screen, coords, frame_dimens, track_dimens, pipe_width, lane_width, corner_radii):
-        self.screen = screen
-        self.coords = coords
-        self.frame_dimens = frame_dimens
-        self.track_dimens = track_dimens
+    def __init__(self, frame,dimens, pipe_width, lane_width, corner_radii):
+        self.frame = frame
+        self.dimens = dimens
         self.pipe_width = pipe_width
         self.lane_width = lane_width
-        self.corner_radii = corner_radii
+        self.corner_radii = (corner_radii[0], lane_width+corner_radii[0])
 
+    def init(self):
+        center = Vector(self.dimens.x/2, self.dimens.y/2)
+
+        width = self.dimens.x - 2*self.lane_width - 2*self.corner_radii[0]
+        height = self.dimens.y - 2*self.lane_width - 2*self.corner_radii[0]
+
+        self.infield_box = Rectangle(Vector(1,1), Vector(1,1)) #Dummy values, gets overwritten in next line
+        self.infield_box.def_by_center(center, Vector(width, height))
+
+    '''
+        Point On Track
+            Returns true if the specified point is on the track. Used for 
+            collision detection with edges. Works by finding the nearest 
+            x and y coordinates on the infield box, then calculates distance
+            from that point. If the distance is within the bounds of the track,
+            it is on the track.
+    '''
+    def point_on_track(self, point):
+        # Find x coordinate on infield box
+        if (point.x < self.infield_box.top_left.x):
+            x = self.infield_box.top_left.x
+        elif (point.x > self.infield_box.top_right.x):
+            x = self.infield_box.top_right.x 
+        else:
+            x = point.x
+
+        # Find y coordinate on infield box
+        if (point.y > self.infield_box.top_left.y):
+            y = self.infield_box.top_left.y
+        elif (point.y < self.infield_box.bottom_left.y):
+            y = self.infield_box.bottom_right.y 
+        else:
+            y = point.y
+
+        ref_point = Vector(x,y)
+        distance = point.distance(ref_point)
+
+        if (distance > self.corner_radii[0] and distance < self.corner_radii[0] + self.lane_width):
+            return True
+        else:
+            return False
+
+    def dist_from_wall(self, point):
+        # Find x coordinate on infield box
+        if (point.x < self.infield_box.top_left.x):
+            x = self.infield_box.top_left.x
+        elif (point.x > self.infield_box.top_right.x):
+            x = self.infield_box.top_right.x 
+        else:
+            x = point.x
+
+        # Find y coordinate on infield box
+        if (point.y > self.infield_box.top_left.y):
+            y = self.infield_box.top_left.y
+        elif (point.y < self.infield_box.bottom_left.y):
+            y = self.infield_box.bottom_right.y 
+        else:
+            y = point.y
+
+        ref_point = Vector(x,y)
+        distance = point.distance(ref_point)
+        inner_dist = distance - self.corner_radii[0]
+        outer_dist = self.corner_radii[0] + self.lane_width - distance
+
+        if (inner_dist < outer_dist):
+            return inner_dist
+        else:
+            return outer_dist
     '''
         Draw
             Handles drawing the track
 
     '''
     def draw(self):
-        pygame.draw
-        pygame.draw.rect(self.screen, Colors.grass, (self.coords[0],self.coords[1], self.frame_dimens[0], self.frame_dimens[1]))
-        center = (self.coords[0]+self.frame_dimens[0]/2, self.coords[1]+self.frame_dimens[1]/2)
-        bounding_box = pygame.Rect(center[0] - self.track_dimens[0]/2, center[1] - self.track_dimens[1]/2, self.track_dimens[0], self.track_dimens[1])
-        pipe_box = pygame.Rect(center[0] - self.track_dimens[0]/2 - self.pipe_width, center[1] - self.track_dimens[1]/2 - self.pipe_width, self.track_dimens[0]+2*self.pipe_width, self.track_dimens[1]+2*self.pipe_width)
-        pygame.draw.rect(self.screen, Colors.pipe, pipe_box, 0, self.corner_radii[0]+self.pipe_width)
-        pygame.draw.rect(self.screen, Colors.dirt, bounding_box, 0, self.corner_radii[0])
-
-        inner_pipe_box = pygame.Rect(center[0] - self.track_dimens[0]/2 + self.lane_width, center[1] - self.track_dimens[1]/2 + self.lane_width, self.track_dimens[0] - 2*self.lane_width, self.track_dimens[1] - 2*self.lane_width)        
-        inner_bounding_box = pygame.Rect(center[0] - self.track_dimens[0]/2 + self.lane_width + self.pipe_width, center[1] - self.track_dimens[1]/2 + self.lane_width + self.pipe_width, self.track_dimens[0] - 2*self.lane_width - 2*self.pipe_width, self.track_dimens[1] - 2*self.lane_width - 2*self.pipe_width)        
-        
-        pygame.draw.rect(self.screen, Colors.pipe, inner_pipe_box, 0, self.corner_radii[1])
-        pygame.draw.rect(self.screen, Colors.grass, inner_bounding_box, 0, self.corner_radii[1] - self.pipe_width)
+        Graphics.fill(self.frame, Colors.grass)
+        pipe_vector = Vector(self.pipe_width,self.pipe_width).multiply(2)
+        outer_dimens = self.dimens.copy()
+        outer_dimens.add(pipe_vector)
+        Graphics.fill_rounded_rect(self.frame, Colors.pipe, self.infield_box.center(), outer_dimens.to_tuple(), self.corner_radii[1]+self.pipe_width)
+        Graphics.fill_rounded_rect(self.frame, Colors.dirt, self.infield_box.center(), self.dimens.to_tuple(), self.corner_radii[1])
+        inner_radius_vector = Vector(self.corner_radii[0],self.corner_radii[0]).multiply(2)
+        inner_pipe_dimens = self.infield_box.dimens.copy()
+        inner_pipe_dimens.add(inner_radius_vector)
+        Graphics.fill_rounded_rect(self.frame, Colors.pipe, self.infield_box.center(), inner_pipe_dimens.to_tuple(), self.corner_radii[0])
+        pipe_vector = Vector(self.pipe_width,self.pipe_width).multiply(-2)
+        inner_pipe_dimens.add(pipe_vector)
+        Graphics.fill_rounded_rect(self.frame, Colors.grass, self.infield_box.center(), inner_pipe_dimens.to_tuple(), self.corner_radii[0]-self.pipe_width)

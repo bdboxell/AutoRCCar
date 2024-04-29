@@ -1,57 +1,39 @@
 from map import *
-from car import *
-
+from occupancy_grid import *
 import pygame
+from clock import *
+from car import*
+import time
+
 '''
     Simulation
         Main class that controls all the flow of events of the simulation
 '''
-class Simulation:
-    cars = []
-    
-    forward_state = 0 #0 is neutral, 1 is forward, -1 is braking
+class Simulation:    
 
-    def __init__(self, screen, frame, dimens):
+    def __init__(self, frame, dimens):
         self.dimens = dimens
-        self.track = Map(screen, (0,0),dimens, (1800,1000),20,350,(300,150))
-        self.draw_background()
+        self.frame = frame
+        self.sim_start()
         
-        self.car = Car(frame,(200,400))
-        self.cars.append(self.car)
+    def sim_start(self):
+        self.last_real_time = time.time()
+        self.map = Map(self.frame,self.dimens, 1,20,(5,15))
+        car_start = Pose(50,10, math.radians(0))
+        self.car = Car(self.frame, car_start, self.map)
 
-    def draw_background(self):
-        self.track.draw()
-        
+        self.map.init()
+
     def update(self):
-        self.draw_background()
-        self.keyboard_state()
-        for car in self.cars:
-            car.update()
-            car.draw()
-        
-    def keyboard_state(self):
-        if self.forward_state == 1:
-            self.car.drive(100)
-        elif self.forward_state == 0:
-            self.car.drive(0)
-        elif (self.forward_state == -1):
-            self.car.drive(-100)
+        self.map.draw()
+        self.car.update()
+        self.car.draw()
 
-    def key_down(self, key):
-        if (key == pygame.K_UP):
-            self.forward_state = 1
-        elif (key == pygame.K_DOWN):
-            self.forward_state = -1
-        elif (key == pygame.K_LEFT):
-            self.car.steer(100)
-        elif (key == pygame.K_RIGHT):
-            self.car.steer(-100)
-    def key_up(self, key):
-        if (key == pygame.K_UP):
-            self.forward_state = 0
-        if (key == pygame.K_DOWN):
-            self.forward_state = 0
-        if (key == pygame.K_LEFT):
-            self.car.steer(0)
-        if (key == pygame.K_RIGHT):
-            self.car.steer(0)
+        # test_point = Pose(90,38, math.radians(90))
+        # Graphics.draw_circle(self.frame, Colors.red, test_point.to_vector(), 1)
+        # self.car.plan_path(test_point, [])
+
+        # Update simulation timer
+        while (time.time() - self.last_real_time < Clock.timestep):
+            time.sleep(0.001)
+        Clock.increment()
